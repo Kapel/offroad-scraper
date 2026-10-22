@@ -1,0 +1,17 @@
+{{- if .Values.pvc.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "offroad-scraper.pvcName" . }}
+  labels:
+    {{- include "offroad-scraper.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.pvc.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.size }}
+  {{- with .Values.pvc.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

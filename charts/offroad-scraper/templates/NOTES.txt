@@ -1,0 +1,41 @@
+Thank you for installing {{ .Chart.Name }}.
+
+The chart deploys:
+  * a `serve` Deployment (HTTP server for the private ICS feed)
+  * a `scrape` CronJob ({{ .Values.schedule.schedule }})
+  * a shared PVC for `/data` state and a ConfigMap for `/config/sites.yaml`
+
+Secret mode: {{ .Values.secret.mode }}
+{{- if eq .Values.secret.mode "values" }}
+  A Secret "{{ include "offroad-scraper.secretName" . }}" is rendered from
+  `secret.values` (remember to set a real DeepSeek API key).
+{{- else if eq .Values.secret.mode "existing" }}
+  The workloads reference the pre-created Secret
+  "{{ include "offroad-scraper.secretName" . }}". It must contain the keys
+  DEEPSEEK_API_KEY and ICS_AUTH_PASSWORD.
+{{- else if eq .Values.secret.mode "external" }}
+  An ExternalSecret "{{ include "offroad-scraper.secretName" . }}" is rendered
+  from `secret.external` (external-secrets operator).
+{{- end }}
+
+Get the application URLs:
+{{- if .Values.ingress.enabled }}
+  {{- range .Values.ingress.paths }}
+  {{- if hasPrefix "http" $.Values.ingress.host }}
+  {{ .path }} -> {{ $.Values.ingress.host }}{{ .path }}
+  {{- else }}
+  {{ .path }} -> http{{ if $.Values.ingress.tls.enabled }}s{{ end }}://{{ $.Values.ingress.host }}{{ .path }}
+  {{- end }}
+  {{- end }}
+{{- else }}
+  The Ingress is disabled. Reach the service via port-forward:
+    kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "offroad-scraper.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://localhost:8080/trips.ics
+{{- end }}
+
+Subscribe to the calendar:
+  * Apple: add the URL https://{{ .Values.ingress.host }}/trips.ics as a
+    "Subscription calendar".
+  * Google: add "From URL" https://{{ .Values.ingress.host }}/trips.ics. If
+    authentication uses a token, note Google Calendar cannot refresh an
+    authenticated URL by itself — see the README for the token-URL caveat.

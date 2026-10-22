@@ -1,0 +1,225 @@
+# Default values for offroad-scraper.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Number of replicas for the `serve` Deployment.
+replicaCount: 1
+
+image:
+  # -- Container image repository.
+  repository: ghcr.io/kapel/offroad-scraper
+  # -- Image tag. Pin a real semver, do NOT use `latest`.
+  tag: "1.0.0"
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- Overrides the Chart name used in resource names.
+nameOverride: ""
+# -- Overrides the fully-qualified app name.
+fullnameOverride: ""
+
+# Configuration for the `scrape` CronJob.
+schedule:
+  # -- Cron schedule (UTC). Default: every 6 hours.
+  schedule: "0 */6 * * *"
+  # -- Suspend the CronJob without deleting it.
+  suspend: false
+  # -- Restart policy for the Job pods (must be OnFailure or Never).
+  restartPolicy: OnFailure
+  # -- Concurrency policy for overlapping Jobs (Allow, Forbid, Replace).
+  concurrencyPolicy: Forbid
+  # -- Number of successful finished Jobs to retain.
+  successfulJobsHistoryLimit: 3
+  # -- Number of failed Jobs to retain.
+  failedJobsHistoryLimit: 1
+  # -- Deadline (seconds) for starting a Job if it misses its scheduled time.
+  startingDeadlineSeconds: 300
+
+# -- The sites to scrape. Rendered into the ConfigMap as `sites.yaml`
+# (a YAML mapping with a `sites:` list of `{name, url, note}` objects).
+sites:
+  - name: Example Offroad Park
+    url: https://example.com/events
+    note: Placeholder - replace with a real site
+  - name: Another Offroad Club
+    url: https://example.org/calendar
+    note: Placeholder - replace with a real site
+
+# -- Email addresses allowed to subscribe to the private ICS feed.
+# (These are not secrets; they are the whitelist checked against the Basic Auth
+# username, case-insensitively.)
+allowedEmails:
+  - user@example.com
+
+# Secret management. Supports three modes: `values`, `existing`, `external`.
+secret:
+  # -- Mode:
+  #   - `values`   -> render a Kubernetes Secret from `secret.values`.
+  #   - `existing` -> reference a pre-created Secret (`secret.existing.name`).
+  #   - `external` -> render an ExternalSecret via the external-secrets operator.
+  mode: values
+  values:
+    # -- DeepSeek API key (used only when `mode: values`). Required for `scrape`.
+    deepseekApiKey: ""
+    # -- Basic Auth password for the ICS endpoints (used only when `mode: values`).
+    # Empty string disables Basic Auth entirely.
+    icsAuthPassword: ""
+    # -- Optional subscription token for the Google Calendar token-URL route
+    # (`/ics/<token>`). Empty string disables that route. Used only when
+    # `mode: values`.
+    subscriptionToken: ""
+  existing:
+    # -- Name of a pre-created Secret (used when `mode: existing`). It must
+    # contain the keys `DEEPSEEK_API_KEY` and `ICS_AUTH_PASSWORD`, and may
+    # optionally contain `SUBSCRIPTION_TOKEN`.
+    name: ""
+  external:
+    # -- Enable the ExternalSecret (used when `mode: external`).
+    enabled: false
+    secretStoreRef:
+      # -- SecretStore / ClusterSecretStore name.
+      name: ""
+      # -- Kind of the store (SecretStore or ClusterSecretStore).
+      kind: ClusterSecretStore
+    # -- Refresh interval for the ExternalSecret.
+    refreshInterval: 1h
+    # -- Maps each app secret key to its remote reference.
+    remoteRefs:
+      DEEPSEEK_API_KEY:
+        key: ""
+        property: ""
+      ICS_AUTH_PASSWORD:
+        key: ""
+        property: ""
+      SUBSCRIPTION_TOKEN:
+        key: ""
+        property: ""
+
+# Application runtime configuration (non-secret).
+config:
+  # -- Bind host for the `serve` server.
+  host: "0.0.0.0"
+  # -- Bind port for the `serve` server (keep in sync with service.targetPort).
+  port: 8080
+  # -- Log level.
+  logLevel: INFO
+  # -- Path to the sites list (mounted from the ConfigMap).
+  sitesFile: /config/sites.yaml
+  # -- Directory where state is written (backed by the PVC).
+  outputDir: /data
+  deepseek:
+    # -- DeepSeek API base URL.
+    baseUrl: https://api.deepseek.com
+    # -- DeepSeek model. Use a current model id (e.g. `deepseek-flash`).
+    model: deepseek-flash
+    # -- DeepSeek request timeout (seconds).
+    timeoutSeconds: 120
+    # -- DeepSeek max tokens per completion.
+    maxTokens: 8000
+    # -- DeepSeek sampling temperature (0 = deterministic extraction).
+    temperature: 0.0
+  # -- Max retries for the extraction step.
+  extractMaxRetries: 3
+  scrape:
+    # -- Per-site scrape timeout (seconds).
+    timeoutSeconds: 30
+    # -- Max bytes to read per site.
+    maxBytes: 1048576
+    # -- User-Agent used when scraping.
+    userAgent: offroad-scraper/1.0
+  # -- Cache-Control max-age (seconds) for the ICS response.
+  icsCacheMaxAge: 300
+  # -- TTL (seconds) for published calendar entries.
+  publishedTtl: 86400
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Pod-level security context.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context.
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+pvc:
+  # -- Create a PVC for the shared `/data` state.
+  enabled: true
+  # -- Storage class name (empty string uses the cluster default).
+  storageClass: ""
+  # -- Access mode.
+  accessMode: ReadWriteOnce
+  # -- Requested size.
+  size: 1Gi
+
+service:
+  # -- Service type.
+  type: ClusterIP
+  # -- Service port.
+  port: 80
+  # -- Target port (must match config.port, i.e. the container's `http` port).
+  targetPort: 8080
+
+ingress:
+  # -- Enable the Ingress.
+  enabled: true
+  # -- Ingress class name.
+  className: ingress-nginx
+  # -- Host name for the ICS feed.
+  host: offroad.example.com
+  tls:
+    # -- Enable TLS via cert-manager.
+    enabled: true
+    # -- TLS secret name.
+    secretName: offroad-scraper-tls
+    # -- cert-manager ClusterIssuer used to mint the certificate.
+    clusterIssuer: letsencrypt-prod
+  # -- Paths exposed through the Ingress. `/ics` (Prefix) also covers the
+  # optional token route `/ics/<token>`. Health/readiness probes stay internal
+  # to the cluster and are not exposed here.
+  paths:
+    - path: /trips.ics
+    - path: /ics
+  # -- Extra Ingress annotations. Cache-related examples (uncomment as needed):
+  #   nginx.ingress.kubernetes.io/proxy-buffering: "on"
+  #   nginx.ingress.kubernetes.io/configuration-snippet: |
+  #     add_header Cache-Control "public, max-age=300";
+  annotations: {}
+
+# NetworkPolicy. When enabled, this renders a default-deny policy that allows
+# ingress from the ingress controller and egress to DNS (53) and HTTPS (443).
+networkPolicy:
+  enabled: false
+  ingressNamespace:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+  dnsNamespace:
+    matchLabels:
+      kubernetes.io/metadata.name: kube-system
+
+# -- Extra annotations for the serve Deployment pods.
+podAnnotations: {}
+# -- Node selector for the serve Deployment pods.
+nodeSelector: {}
+# -- Tolerations for the serve Deployment pods.
+tolerations: []
+# -- Affinity for the serve Deployment pods.
+affinity: {}
