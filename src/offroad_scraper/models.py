@@ -5,9 +5,10 @@ import re
 import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -25,13 +26,21 @@ def _sanitize_text(value: object, max_len: int) -> str:
 
 
 class Site(BaseModel):
-    """A single source website listing offroad/4x4 trips."""
+    """A single source website listing offroad/4x4 trips.
+
+    ``mode="single"`` (default) scrapes the configured URL directly. ``mode="list"``
+    treats the URL as a listing page: candidate trip links are discovered
+    deterministically and each detail page is scraped individually.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     name: str
     url: str
     note: str | None = None
+    mode: Literal["single", "list"] = "single"
+    max_detail_pages: int = Field(default=20, ge=1, le=100)
+    exclude_paths: list[str] = Field(default_factory=list)
 
     @field_validator("url")
     @classmethod

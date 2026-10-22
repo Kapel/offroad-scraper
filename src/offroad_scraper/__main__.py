@@ -7,6 +7,7 @@ import structlog
 
 from offroad_scraper.config import Settings, load_sites
 from offroad_scraper.logging_conf import configure_logging
+from offroad_scraper.models import Trip
 
 logger = structlog.get_logger(__name__)
 
@@ -28,6 +29,7 @@ def run_scrape(settings: Settings) -> int:
     from offroad_scraper.calendar_builder import write_calendar_atomic
     from offroad_scraper.extractor import Extractor
     from offroad_scraper.http_client import HttpClient, HttpClientError
+    from offroad_scraper.link_extractor import extract_candidate_urls
     from offroad_scraper.store import StoreError, TripStore
 
     if settings.deepseek_api_key is None:
@@ -46,6 +48,22 @@ def run_scrape(settings: Settings) -> int:
     extractor = Extractor(settings)
     store = TripStore(settings.output_dir)
 
+    def process_page(site_name: str, html: str, detail_url: str | None) -> int:
+        try:
+            trips = extractor.extract(site_name, html)
+        except openai.OpenAIError as exc:
+            logger.error("fatal llm error, aborting run", site=site_name, error=str(exc))
+            raise
+        if detail_url is not None:
+            trips = [_ensure_url(trip, detail_url) for trip in trips]
+        try:
+            added = store.merge(trips)
+        except StoreError as exc:
+            logger.error("failed to persist trips, aborting run", error=str(exc))
+            raise
+        logger.info("merged trips", site=site_name, found=len(trips), added=added)
+        return len(trips)
+
     total_extracted = 0
     for site in sites:
         logger.info("scraping site", site=site.name, url=site.url)
@@ -54,18 +72,32 @@ def run_scrape(settings: Settings) -> int:
         except HttpClientError as exc:
             logger.error("fetch failed", site=site.name, error=str(exc))
             continue
-        try:
-            trips = extractor.extract(site.name, html)
-        except openai.OpenAIError as exc:
-            logger.error("fatal llm error, aborting run", site=site.name, error=str(exc))
-            return 1
-        total_extracted += len(trips)
-        try:
-            added = store.merge(trips)
-        except StoreError as exc:
-            logger.error("failed to persist trips, aborting run", error=str(exc))
-            return 1
-        logger.info("merged trips", site=site.name, found=len(trips), added=added)
+
+        if site.mode == "list":
+            urls = extract_candidate_urls(
+                html,
+                site.url,
+                exclude_paths=site.exclude_paths,
+                max_urls=site.max_detail_pages,
+            )
+            logger.info("found candidate detail pages", site=site.name, count=len(urls))
+            for detail_url in urls:
+                try:
+                    detail_html = client.fetch(detail_url)
+                except HttpClientError as exc:
+                    logger.error(
+                        "detail fetch failed", site=site.name, url=detail_url, error=str(exc)
+                    )
+                    continue
+                try:
+                    total_extracted += process_page(site.name, detail_html, detail_url)
+                except (openai.OpenAIError, StoreError):
+                    return 1
+        else:
+            try:
+                total_extracted += process_page(site.name, html, None)
+            except (openai.OpenAIError, StoreError):
+                return 1
 
     try:
         all_trips = store.all_trips()
@@ -82,6 +114,12 @@ def run_scrape(settings: Settings) -> int:
     store.save_signature(signature)
     logger.info("wrote calendar", path=str(path), count=len(all_trips), extracted=total_extracted)
     return 0
+
+
+def _ensure_url(trip: Trip, detail_url: str) -> Trip:
+    if trip.url is None:
+        return trip.model_copy(update={"url": detail_url})
+    return trip
 
 
 def run_serve(settings: Settings) -> int:
