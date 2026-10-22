@@ -1,18 +1,26 @@
 # Example sites configuration for offroad-scraper.
 #
 # This file is a YAML mapping with a `sites:` list of site objects. Each site has:
-#   name - a human-readable label
-#   url  - the URL to scrape for events
-#   note - an optional free-form note (ignored by the scraper)
+#   name            - a human-readable label
+#   url             - the URL to scrape
+#   note            - an optional free-form note (ignored by the scraper)
+#   mode            - "single" (default) scrapes the page directly; "list" treats
+#                     it as a listing page and scrapes each discovered detail page
+#   max_detail_pages - cap on detail pages fetched in "list" mode (default 20)
+#   exclude_paths   - extra path substrings to skip when discovering links
 #
-# These entries are PLACEHOLDERS. Replace them with real event/calendar URLs
-# before deploying. In the Helm chart this list is driven by `values.sites` and
-# rendered into the ConfigMap mounted at /config/sites.yaml.
+# These entries are PLACEHOLDERS. Replace them with real URLs before deploying.
+# In the Helm chart this list is driven by `values.sites` and rendered into the
+# ConfigMap mounted at /config/sites.yaml.
 sites:
   - name: Example Offroad Park
     url: https://example.com/events
     note: Placeholder - replace with a real site
 
-  - name: Another Offroad Club
-    url: https://example.org/calendar
-    note: Placeholder - replace with a real site
+  - name: Example detail-list site
+    url: https://example.org/trips
+    mode: list
+    max_detail_pages: 20
+    exclude_paths:
+      - "/reserve"
+      - "/contact"

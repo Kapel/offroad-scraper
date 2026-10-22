@@ -56,3 +56,29 @@ def test_load_sites_skips_invalid_entries(tmp_path: Path) -> None:
     sites = load_sites(path)
     assert len(sites) == 1
     assert sites[0].name == "Good"
+
+
+def test_load_sites_list_mode_defaults_and_fields(tmp_path: Path) -> None:
+    path = tmp_path / "sites.yaml"
+    path.write_text(
+        "sites:\n"
+        "  - name: List\n"
+        "    url: https://example.com/trips\n"
+        "    mode: list\n"
+        "    max_detail_pages: 5\n"
+        "    exclude_paths: ['/reserve', '/contact']\n",
+        encoding="utf-8",
+    )
+    sites = load_sites(path)
+    assert sites[0].mode == "list"
+    assert sites[0].max_detail_pages == 5
+    assert sites[0].exclude_paths == ["/reserve", "/contact"]
+
+
+def test_site_defaults_to_single_mode(tmp_path: Path) -> None:
+    path = tmp_path / "sites.yaml"
+    path.write_text("sites:\n  - name: X\n    url: https://example.com\n", encoding="utf-8")
+    sites = load_sites(path)
+    assert sites[0].mode == "single"
+    assert sites[0].max_detail_pages == 20
+    assert sites[0].exclude_paths == []

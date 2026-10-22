@@ -12,5 +12,16 @@ data:
 {{- range .Values.sites }}
       - name: {{ .name | quote }}
         url: {{ .url | quote }}
-        note: {{ .note | default "" | quote }}
+        {{- if .note }}
+        note: {{ .note | quote }}
+        {{- end }}
+        {{- if .mode }}
+        mode: {{ .mode | quote }}
+        {{- end }}
+        {{- if .maxDetailPages }}
+        max_detail_pages: {{ .maxDetailPages }}
+        {{- end }}
+        {{- if .exclude }}
+        exclude_paths: {{ toJson .exclude }}
+        {{- end }}
 {{- end }}

@@ -39,14 +39,26 @@ schedule:
   startingDeadlineSeconds: 300
 
 # -- The sites to scrape. Rendered into the ConfigMap as `sites.yaml`
-# (a YAML mapping with a `sites:` list of `{name, url, note}` objects).
+# (a YAML mapping with a `sites:` list of objects).
+#
+# Each site supports:
+#   name            - human-readable label (required)
+#   url             - page to scrape (required)
+#   note            - optional free-form note
+#   mode            - "single" (scrape this page directly, default) or "list"
+#                     (discover trip-detail links on this page and scrape each)
+#   maxDetailPages  - cap on detail pages fetched in "list" mode (default 20)
+#   exclude         - extra path substrings to skip when discovering links
 sites:
   - name: Example Offroad Park
     url: https://example.com/events
     note: Placeholder - replace with a real site
-  - name: Another Offroad Club
-    url: https://example.org/calendar
-    note: Placeholder - replace with a real site
+  - name: Example detail-list site
+    url: https://example.org/trips
+    mode: list
+    exclude:
+      - "/reserve"
+      - "/contact"
 
 # -- Email addresses allowed to subscribe to the private ICS feed.
 # (These are not secrets; they are the whitelist checked against the Basic Auth
