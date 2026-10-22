@@ -20,6 +20,10 @@ spec:
             {{- include "offroad-scraper.selectorLabels" . | nindent 12 }}
         spec:
           automountServiceAccountToken: false
+          {{- with .Values.image.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           restartPolicy: {{ .Values.schedule.restartPolicy }}
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
