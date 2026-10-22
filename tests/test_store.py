@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -81,3 +82,13 @@ def test_all_trips_reconstructs_models(tmp_path: Path) -> None:
     assert isinstance(trips[0], Trip)
     assert trips[0].price == Decimal("1290")
     assert trips[0].uid == _trip().uid
+
+
+def test_prune_removes_old_trips(tmp_path: Path) -> None:
+    store = TripStore(tmp_path)
+    store.merge([_trip()])  # ends 2026-11-09
+    store.merge([_trip(destination="Old", start_date="2026-01-01", end_date="2026-01-05")])
+
+    removed = store.prune(date(2026, 6, 1))
+    assert removed == 1
+    assert [t.destination for t in store.all_trips()] == ["Wadi Rum"]

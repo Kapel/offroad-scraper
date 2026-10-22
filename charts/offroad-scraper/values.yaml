@@ -46,7 +46,9 @@ schedule:
 #   url             - page to scrape (required)
 #   note            - optional free-form note
 #   mode            - "single" (scrape this page directly, default) or "list"
-#                     (discover trip-detail links on this page and scrape each)
+#                     (discover trip-detail links and scrape each)
+#   feedUrl         - optional RSS/Atom feed URL; when set in "list" mode, trip
+#                     links are discovered from the feed instead of HTML
 #   maxDetailPages  - cap on detail pages fetched in "list" mode (default 20)
 #   exclude         - extra path substrings to skip when discovering links
 sites:
@@ -56,6 +58,7 @@ sites:
   - name: Example detail-list site
     url: https://example.org/trips
     mode: list
+    feedUrl: https://example.org/feed/
     exclude:
       - "/reserve"
       - "/contact"
@@ -139,9 +142,11 @@ config:
     # -- Per-site scrape timeout (seconds).
     timeoutSeconds: 30
     # -- Max bytes to read per site.
-    maxBytes: 1048576
+    maxBytes: 2000000
     # -- User-Agent used when scraping.
     userAgent: offroad-scraper/1.0
+  # -- Drop trips whose end date is older than this many days from today.
+  retentionDays: 90
   # -- Cache-Control max-age (seconds) for the ICS response.
   icsCacheMaxAge: 300
   # -- TTL (seconds) for published calendar entries.
