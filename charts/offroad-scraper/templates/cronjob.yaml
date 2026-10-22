@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "offroad-scraper.fullname" . }}-scrape
+  labels:
+    {{- include "offroad-scraper.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule.schedule | quote }}
+  suspend: {{ .Values.schedule.suspend }}
+  concurrencyPolicy: {{ .Values.schedule.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "offroad-scraper.selectorLabels" . | nindent 12 }}
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: {{ .Values.schedule.restartPolicy }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: scraper
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - scrape
+              env:
+                {{- include "offroad-scraper.commonEnv" . | nindent 16 }}
+                {{- include "offroad-scraper.scrapeEnv" . | nindent 16 }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: config
+                  mountPath: /config/sites.yaml
+                  subPath: sites.yaml
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "offroad-scraper.pvcName" . }}
+            - name: config
+              configMap:
+                name: {{ include "offroad-scraper.configName" . }}
+            - name: tmp
+              emptyDir: {}

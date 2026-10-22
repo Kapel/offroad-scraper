@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "offroad-scraper.configName" . }}
+  labels:
+    {{- include "offroad-scraper.labels" . | nindent 4 }}
+data:
+  # Rendered as a YAML mapping with a `sites:` list of site objects. Mounted at
+  # /config/sites.yaml (subPath sites.yaml) by the scrape workload.
+  sites.yaml: |
+    sites:
+{{- range .Values.sites }}
+      - name: {{ .name | quote }}
+        url: {{ .url | quote }}
+        note: {{ .note | default "" | quote }}
+{{- end }}

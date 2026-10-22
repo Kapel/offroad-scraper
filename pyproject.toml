@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=83", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "offroad-scraper"
+version = "1.0.0"
+description = "Scrape offroad/4x4 trip listings, extract structured data via the DeepSeek LLM, and publish an ICS calendar over HTTP."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Offroad Scraper" }]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",
+    "openai>=1.30",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "icalendar>=5.0",
+    "structlog>=24.1",
+    "PyYAML>=6.0",
+    "tenacity>=8.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.9",
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "bandit>=1.7.10",
+    "pip-audit>=2.7",
+    "setuptools>=83",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort (import sorting)
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "RUF",  # ruff-specific rules
+    "ARG",  # flake8-unused-arguments
+    "PIE",  # flake8-pie
+    "ANN",  # flake8-annotations
+    "S",    # flake8-bandit (security)
+]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "S106", "ANN", "ARG"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["yaml", "yaml.*"]
+ignore_missing_imports = true

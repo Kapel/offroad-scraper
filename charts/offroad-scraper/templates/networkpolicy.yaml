@@ -1,0 +1,42 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default-deny policy. Once this policy selects the app pods, any traffic not
+# explicitly allowed below (ingress from the ingress controller, egress DNS:53
+# and HTTPS:443) is denied by default.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "offroad-scraper.fullname" . }}
+  labels:
+    {{- include "offroad-scraper.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "offroad-scraper.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from the ingress controller.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressNamespace.matchLabels | nindent 14 }}
+  egress:
+    # Allow DNS queries to the cluster DNS service (UDP + TCP on 53).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dnsNamespace.matchLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow outbound HTTPS (for scraping sites and the DeepSeek API).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+{{- end }}

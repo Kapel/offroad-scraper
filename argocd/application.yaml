@@ -1,0 +1,42 @@
+# Argo CD Application for offroad-scraper.
+#
+# This is a single-source application pointing straight at the chart in this
+# repo. During testing you can point at a feature branch by overriding
+# `spec.source.targetRevision`, e.g.:
+#
+#     spec:
+#       source:
+#         targetRevision: feat-ics-calendar
+#
+# (Keep `path` pointing at `charts/offroad-scraper`.)
+#
+# If you use a multi-source "$values" pattern with a separate k8s-at-home repo,
+# see `argocd/README.md` for the app-of-apps / values-repo wiring.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: offroad-scraper
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Kapel/offroad-scraper.git
+    targetRevision: main
+    path: charts/offroad-scraper
+    helm:
+      # Uncomment to inject your own values file (e.g. secrets via a values repo):
+      # valueFiles:
+      #   - $values/helm-vars/offroad-scraper.yaml
+      #   - $values/helm-vars/offroad-scraper-secrets.yaml
+      valuesObject: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: offroad-scraper
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: false
+    syncOptions:
+      - CreateNamespace=true

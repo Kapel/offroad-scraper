@@ -1,0 +1,6 @@
+sites:
+  - name: "OverlandX"
+    url: "https://example.com/trips"
+    note: "offroad 4x4 trips"
+  - name: "Desert Rides"
+    url: "https://example.org/expeditions"
