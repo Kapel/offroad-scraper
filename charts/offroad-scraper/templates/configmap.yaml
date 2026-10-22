@@ -18,6 +18,9 @@ data:
         {{- if .mode }}
         mode: {{ .mode | quote }}
         {{- end }}
+        {{- if .feedUrl }}
+        feed_url: {{ .feedUrl | quote }}
+        {{- end }}
         {{- if .maxDetailPages }}
         max_detail_pages: {{ .maxDetailPages }}
         {{- end }}

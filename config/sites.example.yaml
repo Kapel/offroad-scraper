@@ -6,6 +6,8 @@
 #   note            - an optional free-form note (ignored by the scraper)
 #   mode            - "single" (default) scrapes the page directly; "list" treats
 #                     it as a listing page and scrapes each discovered detail page
+#   feed_url        - optional RSS/Atom feed URL used for link discovery in "list"
+#                     mode (instead of scraping the HTML for links)
 #   max_detail_pages - cap on detail pages fetched in "list" mode (default 20)
 #   exclude_paths   - extra path substrings to skip when discovering links
 #
@@ -20,6 +22,7 @@ sites:
   - name: Example detail-list site
     url: https://example.org/trips
     mode: list
+    feed_url: https://example.org/feed/
     max_detail_pages: 20
     exclude_paths:
       - "/reserve"

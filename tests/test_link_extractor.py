@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from offroad_scraper.link_extractor import extract_candidate_urls
+from offroad_scraper.link_extractor import extract_candidate_urls, parse_rss_links
 
 BASE = "https://example.com/trips"
 
@@ -63,3 +63,39 @@ def test_ignores_non_http_schemes() -> None:
 def test_caps_at_max_urls() -> None:
     links = "".join(f'<a href="/trip-{i}">x</a>' for i in range(10))
     assert len(extract_candidate_urls(links, BASE, max_urls=3)) == 3
+
+
+RSS = """<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item><title>A</title><link>https://example.com/trip-a</link></item>
+  <item><title>B</title><link>https://example.com/trip-b</link></item>
+  <item><title>C</title><link>https://other.com/x</link></item>
+</channel></rss>
+"""
+
+
+def test_parse_rss_links_extracts_item_links() -> None:
+    assert parse_rss_links(RSS, BASE) == [
+        "https://example.com/trip-a",
+        "https://example.com/trip-b",
+    ]
+
+
+def test_parse_rss_links_excludes_blocked_paths() -> None:
+    rss = """<rss version="2.0"><channel>
+      <item><link>https://example.com/contact</link></item>
+      <item><link>https://example.com/trip-a</link></item>
+    </channel></rss>"""
+    assert parse_rss_links(rss, BASE) == ["https://example.com/trip-a"]
+
+
+def test_parse_rss_links_atom() -> None:
+    atom = """<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry><title>A</title><link href="https://example.com/trip-a"/></entry>
+    </feed>"""
+    assert parse_rss_links(atom, BASE) == ["https://example.com/trip-a"]
+
+
+def test_parse_rss_links_invalid_xml() -> None:
+    assert parse_rss_links("not xml", BASE) == []
