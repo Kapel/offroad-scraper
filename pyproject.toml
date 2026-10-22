@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "offroad-scraper"
-version = "1.0.0"
+version = "1.2.0"
 description = "Scrape offroad/4x4 trip listings, extract structured data via the DeepSeek LLM, and publish an ICS calendar over HTTP."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +21,7 @@ dependencies = [
     "structlog>=24.1",
     "PyYAML>=6.0",
     "tenacity>=8.2",
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -67,5 +68,5 @@ strict = true
 python_version = "3.11"
 
 [[tool.mypy.overrides]]
-module = ["yaml", "yaml.*"]
+module = ["yaml", "yaml.*", "defusedxml", "defusedxml.*"]
 ignore_missing_imports = true

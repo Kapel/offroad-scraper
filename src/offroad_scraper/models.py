@@ -39,18 +39,26 @@ class Site(BaseModel):
     url: str
     note: str | None = None
     mode: Literal["single", "list"] = "single"
+    feed_url: str | None = None
     max_detail_pages: int = Field(default=20, ge=1, le=100)
     exclude_paths: list[str] = Field(default_factory=list)
 
-    @field_validator("url")
+    @field_validator("url", "feed_url")
     @classmethod
-    def _validate_url(cls, value: str) -> str:
+    def _validate_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         parsed = urlparse(value)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise ValueError("url must be an absolute http(s) URL")
         if "@" in parsed.netloc:
             raise ValueError("url must not contain userinfo")
         return value
+
+
+def is_recent(trip: Trip, cutoff: date) -> bool:
+    """True if the trip has not ended before ``cutoff``."""
+    return trip.end_date >= cutoff
 
 
 class Trip(BaseModel):

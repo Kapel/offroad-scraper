@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import structlog
@@ -58,6 +59,16 @@ class TripStore:
             existing[uid] = self._serialize(trip)
         self._write_atomic(list(existing.values()))
         return added
+
+    def prune(self, cutoff: date) -> int:
+        """Remove trips whose end date is before ``cutoff``; return the count removed."""
+        trips = self.all_trips()
+        kept = [trip for trip in trips if trip.end_date >= cutoff]
+        removed = len(trips) - len(kept)
+        if removed:
+            self._write_atomic([self._serialize(trip) for trip in kept])
+            logger.info("pruned old trips", removed=removed, cutoff=cutoff.isoformat())
+        return removed
 
     def all_trips(self) -> list[Trip]:
         trips: list[Trip] = []

@@ -120,6 +120,8 @@ Environment variables specific to the `scrape` workload (LLM extraction).
   value: {{ .Values.config.scrape.maxBytes | int | quote }}
 - name: SCRAPE_USER_AGENT
   value: {{ .Values.config.scrape.userAgent | quote }}
+- name: RETENTION_DAYS
+  value: {{ .Values.config.retentionDays | int | quote }}
 {{- end }}
 
 {{/*

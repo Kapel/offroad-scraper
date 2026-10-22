@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
-from offroad_scraper.models import Trip
+from offroad_scraper.models import Trip, is_recent
 
 
 def make_trip(**overrides: object) -> Trip:
@@ -105,6 +106,12 @@ def test_url_rejects_userinfo() -> None:
 def test_description_strips_control_chars() -> None:
     trip = make_trip(description="Hello\x00\x1bWorld")
     assert trip.description == "Hello World"
+
+
+def test_is_recent() -> None:
+    trip = make_trip(end_date="2026-11-09")
+    assert is_recent(trip, date(2026, 11, 9)) is True
+    assert is_recent(trip, date(2026, 11, 10)) is False
 
 
 def test_uid_ignores_whitespace_and_case() -> None:

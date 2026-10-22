@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date, timedelta
 
 import structlog
 
 from offroad_scraper.config import Settings, load_sites
 from offroad_scraper.logging_conf import configure_logging
-from offroad_scraper.models import Trip
+from offroad_scraper.models import Trip, is_recent
 
 logger = structlog.get_logger(__name__)
 
@@ -29,7 +30,7 @@ def run_scrape(settings: Settings) -> int:
     from offroad_scraper.calendar_builder import write_calendar_atomic
     from offroad_scraper.extractor import Extractor
     from offroad_scraper.http_client import HttpClient, HttpClientError
-    from offroad_scraper.link_extractor import extract_candidate_urls
+    from offroad_scraper.link_extractor import extract_candidate_urls, parse_rss_links
     from offroad_scraper.store import StoreError, TripStore
 
     if settings.deepseek_api_key is None:
@@ -39,6 +40,8 @@ def run_scrape(settings: Settings) -> int:
     sites = load_sites(settings.sites_file)
     if not sites:
         logger.warning("no sites loaded", path=str(settings.sites_file))
+
+    cutoff = date.today() - timedelta(days=settings.retention_days)
 
     client = HttpClient(
         timeout_seconds=settings.scrape_timeout_seconds,
@@ -56,6 +59,7 @@ def run_scrape(settings: Settings) -> int:
             raise
         if detail_url is not None:
             trips = [_ensure_url(trip, detail_url) for trip in trips]
+        trips = [trip for trip in trips if is_recent(trip, cutoff)]
         try:
             added = store.merge(trips)
         except StoreError as exc:
@@ -64,8 +68,39 @@ def run_scrape(settings: Settings) -> int:
         logger.info("merged trips", site=site_name, found=len(trips), added=added)
         return len(trips)
 
+    def crawl_detail_pages(site_name: str, urls: list[str]) -> int:
+        total = 0
+        for detail_url in urls:
+            try:
+                detail_html = client.fetch(detail_url)
+            except HttpClientError as exc:
+                logger.error("detail fetch failed", site=site_name, url=detail_url, error=str(exc))
+                continue
+            total += process_page(site_name, detail_html, detail_url)
+        return total
+
     total_extracted = 0
     for site in sites:
+        if site.mode == "list" and site.feed_url is not None:
+            logger.info("scraping site via feed", site=site.name, feed_url=site.feed_url)
+            try:
+                feed_xml = client.fetch(site.feed_url)
+            except HttpClientError as exc:
+                logger.error("feed fetch failed", site=site.name, error=str(exc))
+                continue
+            urls = parse_rss_links(
+                feed_xml,
+                site.feed_url,
+                exclude_paths=site.exclude_paths,
+                max_urls=site.max_detail_pages,
+            )
+            logger.info("found rss detail pages", site=site.name, count=len(urls))
+            try:
+                total_extracted += crawl_detail_pages(site.name, urls)
+            except (openai.OpenAIError, StoreError):
+                return 1
+            continue
+
         logger.info("scraping site", site=site.name, url=site.url)
         try:
             html = client.fetch(site.url)
@@ -81,18 +116,10 @@ def run_scrape(settings: Settings) -> int:
                 max_urls=site.max_detail_pages,
             )
             logger.info("found candidate detail pages", site=site.name, count=len(urls))
-            for detail_url in urls:
-                try:
-                    detail_html = client.fetch(detail_url)
-                except HttpClientError as exc:
-                    logger.error(
-                        "detail fetch failed", site=site.name, url=detail_url, error=str(exc)
-                    )
-                    continue
-                try:
-                    total_extracted += process_page(site.name, detail_html, detail_url)
-                except (openai.OpenAIError, StoreError):
-                    return 1
+            try:
+                total_extracted += crawl_detail_pages(site.name, urls)
+            except (openai.OpenAIError, StoreError):
+                return 1
         else:
             try:
                 total_extracted += process_page(site.name, html, None)
@@ -100,6 +127,7 @@ def run_scrape(settings: Settings) -> int:
                 return 1
 
     try:
+        store.prune(cutoff)
         all_trips = store.all_trips()
     except StoreError as exc:
         logger.error("failed to read trips store, aborting run", error=str(exc))

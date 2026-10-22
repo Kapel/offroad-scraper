@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     scrape_timeout_seconds: float = 30.0
     scrape_max_bytes: int = 2_000_000
     scrape_user_agent: str = "OffroadScraper/1.0"
+    retention_days: int = 90
 
     allowed_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     ics_auth_password: SecretStr | None = None
@@ -71,6 +72,13 @@ class Settings(BaseSettings):
     def _non_negative_retries(cls, value: int) -> int:
         if value < 0:
             raise ValueError("EXTRACT_MAX_RETRIES must be >= 0")
+        return value
+
+    @field_validator("retention_days", mode="after")
+    @classmethod
+    def _non_negative_retention(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("RETENTION_DAYS must be >= 0")
         return value
 
     @field_validator("port", mode="after")
