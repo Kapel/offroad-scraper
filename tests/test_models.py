@@ -70,8 +70,16 @@ def test_end_date_before_start_date_rejected() -> None:
 
 def test_stable_uid() -> None:
     assert make_trip().uid == make_trip().uid
-    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","wadirum","2026-11-02","2026-11-09"]')
+    expected = uuid.uuid5(
+        uuid.NAMESPACE_URL, '["overlandx","https://example.com/trips/1","2026-11-02","2026-11-09"]'
+    )
     assert make_trip().uid == str(expected)
+
+
+def test_uid_uses_url_when_present() -> None:
+    a = make_trip(destination="Serbia")
+    b = make_trip(destination="Twierdza Modlin, Polska")
+    assert a.uid == b.uid
 
 
 def test_uid_normalizes_provider_spacing() -> None:
@@ -81,14 +89,14 @@ def test_uid_normalizes_provider_spacing() -> None:
 
 
 def test_uid_normalizes_destination_parentheticals() -> None:
-    a = make_trip(destination="Serbia")
-    b = make_trip(destination="Serbia (Serbian Carpathians)")
+    a = make_trip(destination="Serbia", url=None)
+    b = make_trip(destination="Serbia (Serbian Carpathians)", url=None)
     assert a.uid == b.uid
 
 
 def test_uid_keeps_distinct_destinations() -> None:
-    a = make_trip(destination="Serbia")
-    b = make_trip(destination="Bosnia")
+    a = make_trip(destination="Serbia", url=None)
+    b = make_trip(destination="Bosnia", url=None)
     assert a.uid != b.uid
 
 
