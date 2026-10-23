@@ -19,6 +19,18 @@ TRIPS_FILENAME = "trips.json"
 SIGNATURE_FILENAME = ".trips.sig"
 
 
+def _completeness(item: dict[str, object]) -> int:
+    """Score a serialized trip by how much data it carries (higher = richer)."""
+    score = 0
+    if item.get("price") is not None:
+        score += 2
+    if item.get("url"):
+        score += 1
+    if item.get("description"):
+        score += 1
+    return score
+
+
 class StoreError(Exception):
     """Raised when the persisted store cannot be read or written safely."""
 
@@ -54,9 +66,13 @@ class TripStore:
         added = 0
         for trip in trips:
             uid = trip.uid
-            if uid not in existing:
+            serialized = self._serialize(trip)
+            if uid in existing:
+                if _completeness(serialized) >= _completeness(existing[uid]):
+                    existing[uid] = serialized
+            else:
                 added += 1
-            existing[uid] = self._serialize(trip)
+                existing[uid] = serialized
         self._write_atomic(list(existing.values()))
         return added
 
