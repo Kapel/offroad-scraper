@@ -156,8 +156,8 @@ config:
     vehicleDescription: "Toyota Land Cruiser 100 4.2L diesel"
     # -- Average fuel consumption (litres per 100 km).
     fuelConsumptionL100km: 15.0
-    # -- Diesel price (EUR per litre).
-    dieselPriceEur: 1.70
+    # -- Driving range on a full tank (km), used for per-fillup fuel cost.
+    fuelTankRangeKm: 500
     # -- PLN -> EUR exchange rate (to normalise PLN prices).
     plnToEur: 0.23
   # -- Cache-Control max-age (seconds) for the ICS response.
