@@ -8,7 +8,7 @@ from pathlib import Path
 
 from icalendar import Calendar, Event, vDate, vText
 
-from offroad_scraper.models import Trip
+from offroad_scraper.models import CostEstimate, Trip
 
 PRODID = "-//OffroadScraper//Trips//EN"
 CALENDAR_NAME = "Offroad 4x4 Trips"
@@ -68,8 +68,25 @@ def _description(trip: Trip) -> str:
     if trip.price is not None:
         suffix = f" {trip.currency}" if trip.currency else ""
         lines.append(f"Price: {trip.price}{suffix}")
+    if trip.cost is not None:
+        lines.append(_cost_line(trip.cost))
     if trip.url:
         lines.append(f"Link: {trip.url}")
     lines.append("")
     lines.append(trip.description)
     return "\n".join(lines)
+
+
+def _cost_line(cost: CostEstimate) -> str:
+    parts: list[str] = []
+    if cost.distance_km is not None:
+        parts.append(f"~{cost.distance_km} km")
+    if cost.fuel_cost is not None:
+        parts.append(f"fuel {cost.fuel_cost} {cost.currency}")
+    if cost.ferry_cost is not None:
+        parts.append(f"ferry {cost.ferry_cost} {cost.currency}")
+    total = cost.total_cost
+    if total is not None:
+        detail = f" ({', '.join(parts)})" if parts else ""
+        return f"Total cost for you: {total} {cost.currency}{detail}"
+    return "Total cost for you: n/a"

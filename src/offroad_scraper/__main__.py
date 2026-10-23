@@ -28,6 +28,7 @@ def run_scrape(settings: Settings) -> int:
     import openai
 
     from offroad_scraper.calendar_builder import write_calendar_atomic
+    from offroad_scraper.cost_estimator import CostEstimator
     from offroad_scraper.extractor import Extractor
     from offroad_scraper.http_client import HttpClient, HttpClientError
     from offroad_scraper.link_extractor import extract_candidate_urls, parse_rss_links
@@ -49,6 +50,7 @@ def run_scrape(settings: Settings) -> int:
         user_agent=settings.scrape_user_agent,
     )
     extractor = Extractor(settings)
+    cost_estimator = CostEstimator(settings)
     store = TripStore(settings.output_dir)
 
     def process_page(site_name: str, html: str, detail_url: str | None) -> int:
@@ -60,6 +62,7 @@ def run_scrape(settings: Settings) -> int:
         if detail_url is not None:
             trips = [_ensure_url(trip, detail_url) for trip in trips]
         trips = [trip for trip in trips if is_recent(trip, cutoff)]
+        trips = cost_estimator.estimate(trips)
         try:
             added = store.merge(trips)
         except StoreError as exc:

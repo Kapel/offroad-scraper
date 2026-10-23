@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from offroad_scraper.models import Trip, is_recent
+from offroad_scraper.models import CostEstimate, Trip, is_recent
 
 
 def make_trip(**overrides: object) -> Trip:
@@ -70,8 +70,14 @@ def test_end_date_before_start_date_rejected() -> None:
 
 def test_stable_uid() -> None:
     assert make_trip().uid == make_trip().uid
-    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","wadi rum","2026-11-02","2026-11-09"]')
+    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","2026-11-02","2026-11-09"]')
     assert make_trip().uid == str(expected)
+
+
+def test_uid_ignores_destination() -> None:
+    a = make_trip(destination="Serbia")
+    b = make_trip(destination="Serbia (Serbian Carpathians)")
+    assert a.uid == b.uid
 
 
 def test_uid_changes_with_start_date() -> None:
@@ -83,13 +89,6 @@ def test_uid_changes_with_start_date() -> None:
 def test_uid_changes_with_end_date() -> None:
     a = make_trip()
     b = make_trip(end_date="2026-11-12")
-    assert a.uid != b.uid
-
-
-def test_uid_uses_canonical_delimiter() -> None:
-    # "a:b" + "c" must not collide with "a" + "b:c"
-    a = make_trip(provider="a:b", destination="c")
-    b = make_trip(provider="a", destination="b:c")
     assert a.uid != b.uid
 
 
@@ -118,3 +117,20 @@ def test_uid_ignores_whitespace_and_case() -> None:
     a = make_trip(provider=" OverlandX ", destination=" Wadi Rum ")
     b = make_trip(provider="overlandx", destination="wadi rum")
     assert a.uid == b.uid
+
+
+def test_cost_estimate_coerces_values() -> None:
+    est = CostEstimate.model_validate(
+        {"distance_km": "4200", "fuel_cost": "1071.50", "ferry_cost": 700, "total_cost": 4000}
+    )
+    assert est.distance_km == 4200
+    assert est.fuel_cost == Decimal("1071.50")
+    assert est.ferry_cost == Decimal("700")
+    assert est.total_cost == Decimal("4000")
+    assert est.currency == "EUR"
+
+
+def test_trip_with_cost() -> None:
+    trip = make_trip(cost={"distance_km": 4000, "fuel_cost": 1020, "total_cost": 3000})
+    assert trip.cost is not None
+    assert trip.cost.distance_km == 4000

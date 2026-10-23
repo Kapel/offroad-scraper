@@ -122,6 +122,16 @@ Environment variables specific to the `scrape` workload (LLM extraction).
   value: {{ .Values.config.scrape.userAgent | quote }}
 - name: RETENTION_DAYS
   value: {{ .Values.config.retentionDays | int | quote }}
+- name: HOME_LOCATION
+  value: {{ .Values.config.cost.homeLocation | quote }}
+- name: VEHICLE_DESCRIPTION
+  value: {{ .Values.config.cost.vehicleDescription | quote }}
+- name: FUEL_CONSUMPTION_L_100KM
+  value: {{ .Values.config.cost.fuelConsumptionL100km | quote }}
+- name: DIESEL_PRICE_EUR
+  value: {{ .Values.config.cost.dieselPriceEur | quote }}
+- name: PLN_TO_EUR
+  value: {{ .Values.config.cost.plnToEur | quote }}
 {{- end }}
 
 {{/*

@@ -82,6 +82,7 @@ class TripStore:
         return trips
 
     def _serialize(self, trip: Trip) -> dict[str, object]:
+        cost = trip.cost
         return {
             "uid": trip.uid,
             "destination": trip.destination,
@@ -92,6 +93,15 @@ class TripStore:
             "currency": trip.currency,
             "description": trip.description,
             "url": trip.url,
+            "cost": None
+            if cost is None
+            else {
+                "distance_km": cost.distance_km,
+                "fuel_cost": str(cost.fuel_cost) if cost.fuel_cost is not None else None,
+                "ferry_cost": str(cost.ferry_cost) if cost.ferry_cost is not None else None,
+                "total_cost": str(cost.total_cost) if cost.total_cost is not None else None,
+                "currency": cost.currency,
+            },
         }
 
     def content_signature(self) -> str:
