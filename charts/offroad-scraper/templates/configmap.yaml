@@ -21,6 +21,9 @@ data:
         {{- if .feedUrl }}
         feed_url: {{ .feedUrl | quote }}
         {{- end }}
+        {{- if .language }}
+        language: {{ .language | quote }}
+        {{- end }}
         {{- if .maxDetailPages }}
         max_detail_pages: {{ .maxDetailPages }}
         {{- end }}

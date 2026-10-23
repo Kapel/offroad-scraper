@@ -201,3 +201,18 @@ def test_truncate_html_drops_non_http_links() -> None:
     result = truncate_html(html)
     assert "javascript:" not in result
     assert "X (https://example.com/x)" in result
+
+
+def test_extract_language_pl_prompt(settings: Settings, make_extractor) -> None:
+    extractor, fake = make_extractor(settings, [VALID_TRIPS_JSON])
+    extractor.extract("OverlandX", "<html></html>", language="pl")
+    system = fake.chat.completions.calls[0]["messages"][0]["content"]
+    assert "Polish" in system
+    assert "Litwa" in system
+
+
+def test_extract_language_en_prompt(settings: Settings, make_extractor) -> None:
+    extractor, fake = make_extractor(settings, [VALID_TRIPS_JSON])
+    extractor.extract("OverlandX", "<html></html>", language="en")
+    system = fake.chat.completions.calls[0]["messages"][0]["content"]
+    assert "English" in system

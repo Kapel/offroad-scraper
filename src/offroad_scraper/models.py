@@ -59,6 +59,7 @@ class Site(BaseModel):
     note: str | None = None
     mode: Literal["single", "list"] = "single"
     feed_url: str | None = None
+    language: Literal["auto", "en", "pl"] = "auto"
     max_detail_pages: int = Field(default=20, ge=1, le=100)
     exclude_paths: list[str] = Field(default_factory=list)
 

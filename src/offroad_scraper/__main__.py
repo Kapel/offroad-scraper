@@ -53,9 +53,9 @@ def run_scrape(settings: Settings) -> int:
     cost_estimator = CostEstimator(settings)
     store = TripStore(settings.output_dir)
 
-    def process_page(site_name: str, html: str, detail_url: str | None) -> int:
+    def process_page(site_name: str, html: str, detail_url: str | None, language: str) -> int:
         try:
-            trips = extractor.extract(site_name, html)
+            trips = extractor.extract(site_name, html, language)
         except openai.OpenAIError as exc:
             logger.error("fatal llm error, aborting run", site=site_name, error=str(exc))
             raise
@@ -71,7 +71,7 @@ def run_scrape(settings: Settings) -> int:
         logger.info("merged trips", site=site_name, found=len(trips), added=added)
         return len(trips)
 
-    def crawl_detail_pages(site_name: str, urls: list[str]) -> int:
+    def crawl_detail_pages(site_name: str, urls: list[str], language: str) -> int:
         total = 0
         for detail_url in urls:
             try:
@@ -79,7 +79,7 @@ def run_scrape(settings: Settings) -> int:
             except HttpClientError as exc:
                 logger.error("detail fetch failed", site=site_name, url=detail_url, error=str(exc))
                 continue
-            total += process_page(site_name, detail_html, detail_url)
+            total += process_page(site_name, detail_html, detail_url, language)
         return total
 
     total_extracted = 0
@@ -99,7 +99,7 @@ def run_scrape(settings: Settings) -> int:
             )
             logger.info("found rss detail pages", site=site.name, count=len(urls))
             try:
-                total_extracted += crawl_detail_pages(site.name, urls)
+                total_extracted += crawl_detail_pages(site.name, urls, site.language)
             except (openai.OpenAIError, StoreError):
                 return 1
             continue
@@ -120,12 +120,12 @@ def run_scrape(settings: Settings) -> int:
             )
             logger.info("found candidate detail pages", site=site.name, count=len(urls))
             try:
-                total_extracted += crawl_detail_pages(site.name, urls)
+                total_extracted += crawl_detail_pages(site.name, urls, site.language)
             except (openai.OpenAIError, StoreError):
                 return 1
         else:
             try:
-                total_extracted += process_page(site.name, html, None)
+                total_extracted += process_page(site.name, html, None, site.language)
             except (openai.OpenAIError, StoreError):
                 return 1
 

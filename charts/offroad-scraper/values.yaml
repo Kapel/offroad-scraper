@@ -49,6 +49,7 @@ schedule:
 #                     (discover trip-detail links and scrape each)
 #   feedUrl         - optional RSS/Atom feed URL; when set in "list" mode, trip
 #                     links are discovered from the feed instead of HTML
+#   language        - "auto" (default), "en" (force English), or "pl" (force Polish)
 #   maxDetailPages  - cap on detail pages fetched in "list" mode (default 20)
 #   exclude         - extra path substrings to skip when discovering links
 sites:
