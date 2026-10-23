@@ -147,6 +147,18 @@ config:
     userAgent: offroad-scraper/1.0
   # -- Drop trips whose end date is older than this many days from today.
   retentionDays: 90
+  # -- Cost estimation ("total cost for you").
+  cost:
+    # -- Home base used as the origin/destination for distance estimates.
+    homeLocation: "Warsaw, Poland"
+    # -- Vehicle description used for fuel/ferry estimates.
+    vehicleDescription: "Toyota Land Cruiser 100 4.2L diesel"
+    # -- Average fuel consumption (litres per 100 km).
+    fuelConsumptionL100km: 15.0
+    # -- Diesel price (EUR per litre).
+    dieselPriceEur: 1.70
+    # -- PLN -> EUR exchange rate (to normalise PLN prices).
+    plnToEur: 0.23
   # -- Cache-Control max-age (seconds) for the ICS response.
   icsCacheMaxAge: 300
   # -- TTL (seconds) for published calendar entries.

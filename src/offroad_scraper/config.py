@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     scrape_user_agent: str = "OffroadScraper/1.0"
     retention_days: int = 90
 
+    # Cost estimation ("total cost for you").
+    home_location: str = "Warsaw, Poland"
+    vehicle_description: str = "Toyota Land Cruiser 100 4.2L diesel"
+    fuel_consumption_l_100km: float = 15.0
+    diesel_price_eur: float = 1.70
+    pln_to_eur: float = 0.23
+
     allowed_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     ics_auth_password: SecretStr | None = None
     subscription_token: SecretStr | None = None
@@ -98,6 +105,13 @@ class Settings(BaseSettings):
     @field_validator("scrape_timeout_seconds", "deepseek_timeout_seconds", mode="after")
     @classmethod
     def _positive_float(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("value must be positive")
+        return value
+
+    @field_validator("fuel_consumption_l_100km", "diesel_price_eur", "pln_to_eur", mode="after")
+    @classmethod
+    def _positive_cost_float(cls, value: float) -> float:
         if value <= 0:
             raise ValueError("value must be positive")
         return value

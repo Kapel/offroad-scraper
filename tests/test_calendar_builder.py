@@ -6,7 +6,7 @@ from pathlib import Path
 from icalendar import Calendar
 
 from offroad_scraper.calendar_builder import build_calendar, write_calendar_atomic
-from offroad_scraper.models import Trip
+from offroad_scraper.models import CostEstimate, Trip
 
 
 def _trip() -> Trip:
@@ -84,3 +84,24 @@ def test_write_calendar_atomic(tmp_path: Path) -> None:
     assert path == tmp_path / "trips.ics"
     assert path.exists()
     assert Calendar.from_ical(path.read_bytes())
+
+
+def test_cost_rendered_in_description() -> None:
+    trip = _trip().model_copy(
+        update={
+            "cost": CostEstimate.model_validate(
+                {
+                    "distance_km": 4200,
+                    "fuel_cost": "1071",
+                    "ferry_cost": "700",
+                    "total_cost": "3000",
+                    "currency": "EUR",
+                }
+            )
+        }
+    )
+    description = str(_event(build_calendar([trip]))["description"])
+    assert "Total cost for you (est.): 3000 EUR" in description
+    assert "fuel 1071 EUR" in description
+    assert "ferry 700 EUR" in description
+    assert "~4200 km" in description

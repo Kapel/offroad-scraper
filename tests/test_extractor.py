@@ -188,3 +188,16 @@ def test_truncate_html_strips_scripts_and_styles() -> None:
 def test_truncate_html_limits_length() -> None:
     html = "<p>" + ("a" * 20_000) + "</p>"
     assert len(truncate_html(html)) <= 15_000
+
+
+def test_truncate_html_preserves_links() -> None:
+    html = '<a href="https://example.com/trip-a">Bosnia trip</a> and more'
+    result = truncate_html(html)
+    assert "Bosnia trip (https://example.com/trip-a)" in result
+
+
+def test_truncate_html_drops_non_http_links() -> None:
+    html = '<a href="javascript:void(0)">click</a> <a href="https://example.com/x">X</a>'
+    result = truncate_html(html)
+    assert "javascript:" not in result
+    assert "X (https://example.com/x)" in result

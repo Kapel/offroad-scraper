@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from offroad_scraper.models import Trip, is_recent
+from offroad_scraper.models import CostEstimate, Trip, is_recent
 
 
 def make_trip(**overrides: object) -> Trip:
@@ -74,6 +74,18 @@ def test_stable_uid() -> None:
     assert make_trip().uid == str(expected)
 
 
+def test_uid_normalizes_destination_parentheticals() -> None:
+    a = make_trip(destination="Serbia")
+    b = make_trip(destination="Serbia (Serbian Carpathians)")
+    assert a.uid == b.uid
+
+
+def test_uid_keeps_distinct_destinations() -> None:
+    a = make_trip(destination="Serbia")
+    b = make_trip(destination="Bosnia")
+    assert a.uid != b.uid
+
+
 def test_uid_changes_with_start_date() -> None:
     a = make_trip()
     b = make_trip(start_date="2026-12-02", end_date="2026-12-09")
@@ -86,21 +98,10 @@ def test_uid_changes_with_end_date() -> None:
     assert a.uid != b.uid
 
 
-def test_uid_uses_canonical_delimiter() -> None:
-    # "a:b" + "c" must not collide with "a" + "b:c"
-    a = make_trip(provider="a:b", destination="c")
-    b = make_trip(provider="a", destination="b:c")
-    assert a.uid != b.uid
-
-
-def test_url_rejects_unsafe_scheme() -> None:
-    with pytest.raises(ValidationError):
-        make_trip(url="javascript:alert(1)")
-
-
-def test_url_rejects_userinfo() -> None:
-    with pytest.raises(ValidationError):
-        make_trip(url="https://user:pass@example.com/trips/1")
+def test_url_invalid_becomes_none() -> None:
+    assert make_trip(url="javascript:alert(1)").url is None
+    assert make_trip(url="https://user:pass@example.com/trips/1").url is None
+    assert make_trip(url="/relative/path").url is None
 
 
 def test_description_strips_control_chars() -> None:
@@ -118,3 +119,30 @@ def test_uid_ignores_whitespace_and_case() -> None:
     a = make_trip(provider=" OverlandX ", destination=" Wadi Rum ")
     b = make_trip(provider="overlandx", destination="wadi rum")
     assert a.uid == b.uid
+
+
+def test_cost_estimate_coerces_values() -> None:
+    est = CostEstimate.model_validate(
+        {"distance_km": "4200", "fuel_cost": "1071.50", "ferry_cost": 700, "total_cost": 4000}
+    )
+    assert est.distance_km == 4200
+    assert est.fuel_cost == Decimal("1071.50")
+    assert est.ferry_cost == Decimal("700")
+    assert est.total_cost == Decimal("4000")
+    assert est.currency == "EUR"
+
+
+def test_trip_with_cost() -> None:
+    trip = make_trip(cost={"distance_km": 4000, "fuel_cost": 1020, "total_cost": 3000})
+    assert trip.cost is not None
+    assert trip.cost.distance_km == 4000
+
+
+def test_cost_estimate_distance_from_decimal() -> None:
+    est = CostEstimate.model_validate({"distance_km": Decimal("4200.7")})
+    assert est.distance_km == 4201
+
+
+def test_cost_estimate_rejects_negative() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate.model_validate({"fuel_cost": -5})

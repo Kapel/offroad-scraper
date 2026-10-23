@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import html as html_lib
 import json
 import re
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import openai
 import structlog
@@ -43,20 +45,41 @@ _SYSTEM_PROMPT = (
     "Rules:\n"
     "- start_date and end_date are ISO-8601 dates (YYYY-MM-DD).\n"
     "- price is a number or null; currency is a 3-letter ISO-4217 code or null.\n"
-    "- url is the absolute URL of the specific trip offer, or null.\n"
-    "- description is a concise 1-3 sentence description of the trip. Preserve the "
-    "language exactly as written if the source is in English or Polish. If the "
-    "source is in any other language, translate the description to English.\n"
+    "- url is the absolute URL of the specific trip offer, or null. Use the URL shown "
+    "in parentheses right after a link's text when available.\n"
+    "- destination and description MUST be written in English, unless the source page "
+    "is in Polish (then keep them in Polish). Translate any other language (Dutch, "
+    "German, French, ...) to English: 'Centraal Azië' -> 'Central Asia', 'Bosnië' -> "
+    "'Bosnia', 'Griekenland' -> 'Greece', 'Noord-Griekenland' -> 'Northern Greece'. "
+    "Never leave Dutch or any non-English/non-Polish wording in destination or "
+    "description.\n"
     '- If there are no trips, return {"trips": []}.\n'
     "- Do not include any text outside the JSON object and do not wrap the output in "
     "markdown code fences.\n"
 )
 
 _SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1>")
+_ANCHOR_RE = re.compile(r"(?is)<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>")
 _TAG_RE = re.compile(r"(?s)<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
+_TRACKING_PARAMS = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "mc_cid",
+        "mc_eid",
+        "igshid",
+    }
+)
 
 
 class ExtractionError(Exception):
@@ -69,9 +92,45 @@ def _redact_pii(text: str) -> str:
     return _PHONE_RE.sub("[phone]", text)
 
 
+def _clean_href(href: str) -> str | None:
+    """Normalize an absolute http(s) URL for inline link text, or None to drop it."""
+    try:
+        parsed = urlparse(href)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or "@" in parsed.netloc:
+        return None
+    query = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() not in _TRACKING_PARAMS]
+    return urlunparse(
+        (parsed.scheme, parsed.netloc.lower(), parsed.path, parsed.params, urlencode(query), "")
+    )
+
+
+def _preserve_links(html: str) -> str:
+    """Rewrite ``<a href=URL>TEXT</a>`` as ``TEXT (URL)`` so offer links survive.
+
+    Without this, the tag-stripping in :func:`truncate_html` discards href
+    attributes, so the model can no longer associate a trip with its offer URL.
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        href = html_lib.unescape(match.group(1)).strip()
+        text = _TAG_RE.sub(" ", match.group(2))
+        text = html_lib.unescape(_WHITESPACE_RE.sub(" ", text)).strip()
+        if not text:
+            return ""
+        clean = _clean_href(href)
+        if clean is None:
+            return text
+        return f"{text} ({clean})"
+
+    return _ANCHOR_RE.sub(_replace, html)
+
+
 def truncate_html(html: str, limit: int = MAX_HTML_CHARS) -> str:
-    """Strip scripts/styles/tags, scrub PII, collapse whitespace, cap the budget."""
+    """Strip scripts/styles, preserve links, scrub PII, collapse whitespace, cap budget."""
     text = _SCRIPT_STYLE_RE.sub(" ", html)
+    text = _preserve_links(text)
     text = _TAG_RE.sub(" ", text)
     text = _WHITESPACE_RE.sub(" ", text).strip()
     text = _redact_pii(text)

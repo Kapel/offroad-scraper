@@ -25,6 +25,25 @@ def _sanitize_text(value: object, max_len: int) -> str:
     return text[:max_len]
 
 
+def _coerce_decimal(value: object) -> Decimal | None:
+    """Coerce a JSON-ish value to Decimal, or None. Rejects booleans."""
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, bool):
+        raise ValueError("must be a number, not a boolean")
+    if isinstance(value, (int, float, str)):
+        text = str(value).strip()
+        if text == "":
+            return None
+        try:
+            return Decimal(text)
+        except InvalidOperation as exc:
+            raise ValueError(f"invalid number: {value!r}") from exc
+    raise ValueError(f"must be a number, got {type(value).__name__}")
+
+
 class Site(BaseModel):
     """A single source website listing offroad/4x4 trips.
 
@@ -61,6 +80,49 @@ def is_recent(trip: Trip, cutoff: date) -> bool:
     return trip.end_date >= cutoff
 
 
+class CostEstimate(BaseModel):
+    """Estimated personal cost of a trip for the configured vehicle/driver."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    distance_km: int | None = Field(default=None, ge=0)
+    fuel_cost: Decimal | None = Field(default=None, ge=0)
+    ferry_cost: Decimal | None = Field(default=None, ge=0)
+    total_cost: Decimal | None = Field(default=None, ge=0)
+    currency: str = "EUR"
+
+    @field_validator("fuel_cost", "ferry_cost", "total_cost", mode="before")
+    @classmethod
+    def _coerce_money(cls, value: object) -> Decimal | None:
+        return _coerce_decimal(value)
+
+    @field_validator("distance_km", mode="before")
+    @classmethod
+    def _coerce_distance(cls, value: object) -> int | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool):
+            raise ValueError("distance_km must be a number, not a boolean")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, (str, float, Decimal)):
+            try:
+                return round(Decimal(str(value)))
+            except InvalidOperation as exc:
+                raise ValueError(f"invalid number: {value!r}") from exc
+        raise ValueError("distance_km must be a number")
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def _validate_currency(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("currency must be a string")
+        currency = value.strip().upper()
+        if len(currency) != 3 or not currency.isalpha():
+            raise ValueError("currency must be a 3-letter ISO-4217 code")
+        return currency
+
+
 class Trip(BaseModel):
     """A single extracted trip listing.
 
@@ -80,6 +142,7 @@ class Trip(BaseModel):
     currency: str | None = None
     description: str
     url: str | None = None
+    cost: CostEstimate | None = None
 
     @field_validator("destination", "provider")
     @classmethod
@@ -97,21 +160,7 @@ class Trip(BaseModel):
     @field_validator("price", mode="before")
     @classmethod
     def _coerce_price(cls, value: object) -> Decimal | None:
-        if value is None:
-            return None
-        if isinstance(value, Decimal):
-            return value
-        if isinstance(value, bool):
-            raise ValueError("price must be a number, not a boolean")
-        if isinstance(value, (int, float, str)):
-            text = str(value).strip()
-            if text == "":
-                return None
-            try:
-                return Decimal(text)
-            except InvalidOperation as exc:
-                raise ValueError(f"invalid price value: {value!r}") from exc
-        raise ValueError(f"price must be a number, got {type(value).__name__}")
+        return _coerce_decimal(value)
 
     @field_validator("currency", mode="before")
     @classmethod
@@ -136,10 +185,8 @@ class Trip(BaseModel):
         if value == "":
             return None
         parsed = urlparse(value)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise ValueError("url must be an absolute http(s) URL")
-        if "@" in parsed.netloc:
-            raise ValueError("url must not contain userinfo")
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or "@" in parsed.netloc:
+            return None
         return value
 
     @model_validator(mode="after")
@@ -150,15 +197,17 @@ class Trip(BaseModel):
 
     @property
     def uid(self) -> str:
-        """Stable identifier, identical for the same logical trip across runs.
+        """Stable identifier for a trip: provider + normalized destination + dates.
 
-        The key is a canonical JSON array (not a delimited string) so that
-        free-text values cannot collide by embedding the delimiter.
+        The destination is normalized (lowercased, parenthetical qualifiers
+        stripped) so cosmetic naming differences like "Serbia" vs "Serbia
+        (Serbian Carpathians)" collapse to one event, while genuinely different
+        destinations remain distinct.
         """
         key = json.dumps(
             [
                 self.provider.strip().lower(),
-                self.destination.strip().lower(),
+                _normalize_destination(self.destination),
                 self.start_date.isoformat(),
                 self.end_date.isoformat(),
             ],
@@ -166,3 +215,9 @@ class Trip(BaseModel):
             separators=(",", ":"),
         )
         return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
+
+
+def _normalize_destination(destination: str) -> str:
+    """Lowercase and strip parenthetical qualifiers for stable UID keys."""
+    text = re.sub(r"\([^)]*\)", " ", destination)
+    return " ".join(text.lower().split())
