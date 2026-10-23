@@ -92,3 +92,12 @@ def test_prune_removes_old_trips(tmp_path: Path) -> None:
     removed = store.prune(date(2026, 6, 1))
     assert removed == 1
     assert [t.destination for t in store.all_trips()] == ["Wadi Rum"]
+
+
+def test_merge_prefers_more_complete_trip(tmp_path: Path) -> None:
+    store = TripStore(tmp_path)
+    store.merge([_trip(price="1000")])
+    store.merge([_trip(price=None)])
+    data = _load(tmp_path)
+    assert len(data) == 1
+    assert data[0]["price"] == "1000"
