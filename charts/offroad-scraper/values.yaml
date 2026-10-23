@@ -158,6 +158,8 @@ config:
     fuelConsumptionL100km: 15.0
     # -- Driving range on a full tank (km), used for per-fillup fuel cost.
     fuelTankRangeKm: 500
+    # -- Refresh interval (days) for the EU Weekly Oil Bulletin diesel prices.
+    fuelPriceRefreshDays: 7
     # -- PLN -> EUR exchange rate (to normalise PLN prices).
     plnToEur: 0.23
   # -- Cache-Control max-age (seconds) for the ICS response.

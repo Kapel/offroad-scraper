@@ -22,6 +22,7 @@ dependencies = [
     "PyYAML>=6.0",
     "tenacity>=8.2",
     "defusedxml>=0.7",
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -68,5 +69,5 @@ strict = true
 python_version = "3.11"
 
 [[tool.mypy.overrides]]
-module = ["yaml", "yaml.*", "defusedxml", "defusedxml.*"]
+module = ["yaml", "yaml.*", "defusedxml", "defusedxml.*", "openpyxl", "openpyxl.*"]
 ignore_missing_imports = true

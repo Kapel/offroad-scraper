@@ -30,6 +30,7 @@ def run_scrape(settings: Settings) -> int:
     from offroad_scraper.calendar_builder import write_calendar_atomic
     from offroad_scraper.cost_estimator import CostEstimator
     from offroad_scraper.extractor import Extractor
+    from offroad_scraper.fuel_prices import FuelPriceProvider
     from offroad_scraper.http_client import HttpClient, HttpClientError
     from offroad_scraper.link_extractor import extract_candidate_urls, parse_rss_links
     from offroad_scraper.store import StoreError, TripStore
@@ -50,7 +51,11 @@ def run_scrape(settings: Settings) -> int:
         user_agent=settings.scrape_user_agent,
     )
     extractor = Extractor(settings)
-    cost_estimator = CostEstimator(settings)
+    fuel_prices = FuelPriceProvider(
+        settings.output_dir / "fuel-prices.json",
+        refresh_days=settings.fuel_price_refresh_days,
+    ).prices()
+    cost_estimator = CostEstimator(settings, fuel_prices)
     store = TripStore(settings.output_dir)
 
     def process_page(site_name: str, html: str, detail_url: str | None, language: str) -> int:

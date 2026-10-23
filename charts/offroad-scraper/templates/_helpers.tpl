@@ -130,6 +130,8 @@ Environment variables specific to the `scrape` workload (LLM extraction).
   value: {{ .Values.config.cost.fuelConsumptionL100km | quote }}
 - name: FUEL_TANK_RANGE_KM
   value: {{ .Values.config.cost.fuelTankRangeKm | int | quote }}
+- name: FUEL_PRICE_REFRESH_DAYS
+  value: {{ .Values.config.cost.fuelPriceRefreshDays | int | quote }}
 - name: PLN_TO_EUR
   value: {{ .Values.config.cost.plnToEur | quote }}
 {{- end }}
