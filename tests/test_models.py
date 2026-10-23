@@ -70,8 +70,14 @@ def test_end_date_before_start_date_rejected() -> None:
 
 def test_stable_uid() -> None:
     assert make_trip().uid == make_trip().uid
-    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","wadi rum","2026-11-02","2026-11-09"]')
+    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","wadirum","2026-11-02","2026-11-09"]')
     assert make_trip().uid == str(expected)
+
+
+def test_uid_normalizes_provider_spacing() -> None:
+    a = make_trip(provider="Bez Asfaltu 4x4")
+    b = make_trip(provider="BezAsfaltu4x4")
+    assert a.uid == b.uid
 
 
 def test_uid_normalizes_destination_parentheticals() -> None:

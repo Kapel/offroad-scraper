@@ -207,7 +207,7 @@ class Trip(BaseModel):
         """
         key = json.dumps(
             [
-                self.provider.strip().lower(),
+                _normalize_provider(self.provider),
                 _normalize_destination(self.destination),
                 self.start_date.isoformat(),
                 self.end_date.isoformat(),
@@ -218,7 +218,13 @@ class Trip(BaseModel):
         return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
 
 
+def _normalize_provider(provider: str) -> str:
+    """Lowercase and drop non-alphanumeric chars so 'Bez Asfaltu 4x4' and
+    'BezAsfaltu4x4' collapse to one provider key."""
+    return re.sub(r"[^a-z0-9]", "", provider.lower())
+
+
 def _normalize_destination(destination: str) -> str:
-    """Lowercase and strip parenthetical qualifiers for stable UID keys."""
+    """Lowercase, strip parenthetical qualifiers and non-alphanumeric chars."""
     text = re.sub(r"\([^)]*\)", " ", destination)
-    return " ".join(text.lower().split())
+    return re.sub(r"[^a-z0-9]", "", text.lower())
