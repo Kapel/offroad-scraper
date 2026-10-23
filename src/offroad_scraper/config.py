@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     home_location: str = "Warsaw, Poland"
     vehicle_description: str = "Toyota Land Cruiser 100 4.2L diesel"
     fuel_consumption_l_100km: float = 15.0
-    diesel_price_eur: float = 1.70
+    fuel_tank_range_km: int = 500
     pln_to_eur: float = 0.23
 
     allowed_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
@@ -109,11 +109,18 @@ class Settings(BaseSettings):
             raise ValueError("value must be positive")
         return value
 
-    @field_validator("fuel_consumption_l_100km", "diesel_price_eur", "pln_to_eur", mode="after")
+    @field_validator("fuel_consumption_l_100km", "pln_to_eur", mode="after")
     @classmethod
     def _positive_cost_float(cls, value: float) -> float:
         if value <= 0:
             raise ValueError("value must be positive")
+        return value
+
+    @field_validator("fuel_tank_range_km", mode="after")
+    @classmethod
+    def _positive_tank_range(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("fuel_tank_range_km must be positive")
         return value
 
 
