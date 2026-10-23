@@ -70,14 +70,20 @@ def test_end_date_before_start_date_rejected() -> None:
 
 def test_stable_uid() -> None:
     assert make_trip().uid == make_trip().uid
-    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","2026-11-02","2026-11-09"]')
+    expected = uuid.uuid5(uuid.NAMESPACE_URL, '["overlandx","wadi rum","2026-11-02","2026-11-09"]')
     assert make_trip().uid == str(expected)
 
 
-def test_uid_ignores_destination() -> None:
+def test_uid_normalizes_destination_parentheticals() -> None:
     a = make_trip(destination="Serbia")
     b = make_trip(destination="Serbia (Serbian Carpathians)")
     assert a.uid == b.uid
+
+
+def test_uid_keeps_distinct_destinations() -> None:
+    a = make_trip(destination="Serbia")
+    b = make_trip(destination="Bosnia")
+    assert a.uid != b.uid
 
 
 def test_uid_changes_with_start_date() -> None:
@@ -92,14 +98,10 @@ def test_uid_changes_with_end_date() -> None:
     assert a.uid != b.uid
 
 
-def test_url_rejects_unsafe_scheme() -> None:
-    with pytest.raises(ValidationError):
-        make_trip(url="javascript:alert(1)")
-
-
-def test_url_rejects_userinfo() -> None:
-    with pytest.raises(ValidationError):
-        make_trip(url="https://user:pass@example.com/trips/1")
+def test_url_invalid_becomes_none() -> None:
+    assert make_trip(url="javascript:alert(1)").url is None
+    assert make_trip(url="https://user:pass@example.com/trips/1").url is None
+    assert make_trip(url="/relative/path").url is None
 
 
 def test_description_strips_control_chars() -> None:
@@ -134,3 +136,13 @@ def test_trip_with_cost() -> None:
     trip = make_trip(cost={"distance_km": 4000, "fuel_cost": 1020, "total_cost": 3000})
     assert trip.cost is not None
     assert trip.cost.distance_km == 4000
+
+
+def test_cost_estimate_distance_from_decimal() -> None:
+    est = CostEstimate.model_validate({"distance_km": Decimal("4200.7")})
+    assert est.distance_km == 4201
+
+
+def test_cost_estimate_rejects_negative() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate.model_validate({"fuel_cost": -5})

@@ -85,10 +85,10 @@ class CostEstimate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    distance_km: int | None = None
-    fuel_cost: Decimal | None = None
-    ferry_cost: Decimal | None = None
-    total_cost: Decimal | None = None
+    distance_km: int | None = Field(default=None, ge=0)
+    fuel_cost: Decimal | None = Field(default=None, ge=0)
+    ferry_cost: Decimal | None = Field(default=None, ge=0)
+    total_cost: Decimal | None = Field(default=None, ge=0)
     currency: str = "EUR"
 
     @field_validator("fuel_cost", "ferry_cost", "total_cost", mode="before")
@@ -105,9 +105,22 @@ class CostEstimate(BaseModel):
             raise ValueError("distance_km must be a number, not a boolean")
         if isinstance(value, int):
             return value
-        if isinstance(value, (str, float)):
-            return int(Decimal(str(value)))
+        if isinstance(value, (str, float, Decimal)):
+            try:
+                return round(Decimal(str(value)))
+            except InvalidOperation as exc:
+                raise ValueError(f"invalid number: {value!r}") from exc
         raise ValueError("distance_km must be a number")
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def _validate_currency(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("currency must be a string")
+        currency = value.strip().upper()
+        if len(currency) != 3 or not currency.isalpha():
+            raise ValueError("currency must be a 3-letter ISO-4217 code")
+        return currency
 
 
 class Trip(BaseModel):
@@ -172,10 +185,8 @@ class Trip(BaseModel):
         if value == "":
             return None
         parsed = urlparse(value)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise ValueError("url must be an absolute http(s) URL")
-        if "@" in parsed.netloc:
-            raise ValueError("url must not contain userinfo")
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or "@" in parsed.netloc:
+            return None
         return value
 
     @model_validator(mode="after")
@@ -186,16 +197,17 @@ class Trip(BaseModel):
 
     @property
     def uid(self) -> str:
-        """Stable identifier for a trip: provider + start + end dates.
+        """Stable identifier for a trip: provider + normalized destination + dates.
 
-        The destination is deliberately excluded so that cosmetic naming
-        differences (e.g. "Serbia" vs "Serbia (Serbian Carpathians)", or a
-        Dutch vs English translation) collapse to a single event rather than
-        producing duplicates.
+        The destination is normalized (lowercased, parenthetical qualifiers
+        stripped) so cosmetic naming differences like "Serbia" vs "Serbia
+        (Serbian Carpathians)" collapse to one event, while genuinely different
+        destinations remain distinct.
         """
         key = json.dumps(
             [
                 self.provider.strip().lower(),
+                _normalize_destination(self.destination),
                 self.start_date.isoformat(),
                 self.end_date.isoformat(),
             ],
@@ -203,3 +215,9 @@ class Trip(BaseModel):
             separators=(",", ":"),
         )
         return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
+
+
+def _normalize_destination(destination: str) -> str:
+    """Lowercase and strip parenthetical qualifiers for stable UID keys."""
+    text = re.sub(r"\([^)]*\)", " ", destination)
+    return " ".join(text.lower().split())

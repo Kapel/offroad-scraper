@@ -4,6 +4,7 @@ import html as html_lib
 import json
 import re
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import openai
 import structlog
@@ -63,6 +64,22 @@ _TAG_RE = re.compile(r"(?s)<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
+_TRACKING_PARAMS = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "mc_cid",
+        "mc_eid",
+        "igshid",
+    }
+)
 
 
 class ExtractionError(Exception):
@@ -73,6 +90,20 @@ def _redact_pii(text: str) -> str:
     """Best-effort scrub of emails and phone numbers before sending to the LLM."""
     text = _EMAIL_RE.sub("[email]", text)
     return _PHONE_RE.sub("[phone]", text)
+
+
+def _clean_href(href: str) -> str | None:
+    """Normalize an absolute http(s) URL for inline link text, or None to drop it."""
+    try:
+        parsed = urlparse(href)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or "@" in parsed.netloc:
+        return None
+    query = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() not in _TRACKING_PARAMS]
+    return urlunparse(
+        (parsed.scheme, parsed.netloc.lower(), parsed.path, parsed.params, urlencode(query), "")
+    )
 
 
 def _preserve_links(html: str) -> str:
@@ -86,11 +117,12 @@ def _preserve_links(html: str) -> str:
         href = html_lib.unescape(match.group(1)).strip()
         text = _TAG_RE.sub(" ", match.group(2))
         text = html_lib.unescape(_WHITESPACE_RE.sub(" ", text)).strip()
-        if not href or href.startswith(("javascript:", "mailto:", "tel:", "data:", "#")):
+        if not text:
+            return ""
+        clean = _clean_href(href)
+        if clean is None:
             return text
-        if text and href:
-            return f"{text} ({href})"
-        return href
+        return f"{text} ({clean})"
 
     return _ANCHOR_RE.sub(_replace, html)
 

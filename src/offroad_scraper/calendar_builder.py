@@ -79,14 +79,13 @@ def _description(trip: Trip) -> str:
 
 def _cost_line(cost: CostEstimate) -> str:
     parts: list[str] = []
-    if cost.distance_km is not None:
+    if cost.distance_km:
         parts.append(f"~{cost.distance_km} km")
-    if cost.fuel_cost is not None:
+    if cost.fuel_cost:
         parts.append(f"fuel {cost.fuel_cost} {cost.currency}")
-    if cost.ferry_cost is not None:
+    if cost.ferry_cost:
         parts.append(f"ferry {cost.ferry_cost} {cost.currency}")
-    total = cost.total_cost
-    if total is not None:
-        detail = f" ({', '.join(parts)})" if parts else ""
-        return f"Total cost for you: {total} {cost.currency}{detail}"
-    return "Total cost for you: n/a"
+    detail = f" ({', '.join(parts)})" if parts else ""
+    if cost.total_cost is not None:
+        return f"Total cost for you (est.): {cost.total_cost} {cost.currency}{detail}"
+    return f"Est. fuel/ferry: {'; '.join(parts)}" if parts else "Total cost for you: n/a"

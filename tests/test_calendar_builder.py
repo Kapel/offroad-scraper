@@ -101,7 +101,7 @@ def test_cost_rendered_in_description() -> None:
         }
     )
     description = str(_event(build_calendar([trip]))["description"])
-    assert "Total cost for you: 3000 EUR" in description
+    assert "Total cost for you (est.): 3000 EUR" in description
     assert "fuel 1071 EUR" in description
     assert "ferry 700 EUR" in description
     assert "~4200 km" in description
