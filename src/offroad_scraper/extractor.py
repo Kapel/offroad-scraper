@@ -68,7 +68,9 @@ def _system_prompt(language: str) -> str:
         '"url": "https://example.com/trips/123"}]}\n\n'
         "Rules:\n"
         "- start_date and end_date are ISO-8601 dates (YYYY-MM-DD).\n"
-        "- price is a number or null; currency is a 3-letter ISO-4217 code or null.\n"
+        "- price is a number or null; currency is a 3-letter ISO-4217 code or null. Polish "
+        "pages write 'Cena <n> PLN' or 'Cena od <n> PLN' (treat 'od' as the base/minimum "
+        "price). 'Cena nie zawiera' introduces a list of exclusions, NOT the price — ignore it.\n"
         "- url is the absolute URL of the specific trip offer, or null. Use the URL shown "
         "in parentheses right after a link's text when available.\n"
         f"{_LANG_RULES[language]}"
