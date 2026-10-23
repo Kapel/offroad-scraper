@@ -61,6 +61,7 @@ def run_scrape(settings: Settings) -> int:
             raise
         if detail_url is not None:
             trips = [_ensure_url(trip, detail_url) for trip in trips]
+        trips = [trip.model_copy(update={"provider": site_name}) for trip in trips]
         trips = [trip for trip in trips if is_recent(trip, cutoff)]
         trips = cost_estimator.estimate(trips)
         try:
