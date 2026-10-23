@@ -53,10 +53,11 @@ def _trip_payload(trips: list[Trip]) -> str:
 class CostEstimator:
     """Estimates the personal (out-of-pocket) cost of each trip for the driver."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, diesel_prices: dict[str, float] | None = None) -> None:
         if settings.deepseek_api_key is None:
             raise ValueError("DEEPSEEK_API_KEY must be set to use the CostEstimator")
         self._settings = settings
+        self._diesel_prices = diesel_prices or {}
         self._client = OpenAI(
             api_key=settings.deepseek_api_key.get_secret_value(),
             base_url=settings.deepseek_base_url,
@@ -67,6 +68,16 @@ class CostEstimator:
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=1, min=1, max=30, exp_base=2),
             reraise=True,
+        )
+
+    def _price_table(self) -> str:
+        if not self._diesel_prices:
+            return ""
+        items = ", ".join(f"{c} {p:.2f}" for c, p in sorted(self._diesel_prices.items()))
+        return (
+            f"Known CURRENT diesel prices in EUR per litre (use these exact values for "
+            f"these countries; for countries not listed use your own current knowledge): "
+            f"{items}.\n"
         )
 
     def _system_prompt(self) -> str:
@@ -81,7 +92,8 @@ class CostEstimator:
             f"Fuel consumption: {s.fuel_consumption_l_100km} L/100km.\n"
             f"Full tank range: {s.fuel_tank_range_km} km.\n"
             f"Home base (driving starts and ends here): {s.home_location}.\n"
-            f"Exchange rate: 1 PLN = {s.pln_to_eur} EUR.\n\n"
+            f"Exchange rate: 1 PLN = {s.pln_to_eur} EUR.\n"
+            f"{self._price_table()}"
             "For each trip estimate:\n"
             "- distance_km: the total round-trip driving distance from the home base to "
             "the trip's start area and back (approximate; include the tour's own driving).\n"

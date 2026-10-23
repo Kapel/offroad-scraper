@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     vehicle_description: str = "Toyota Land Cruiser 100 4.2L diesel"
     fuel_consumption_l_100km: float = 15.0
     fuel_tank_range_km: int = 500
+    fuel_price_refresh_days: int = 7
     pln_to_eur: float = 0.23
 
     allowed_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
