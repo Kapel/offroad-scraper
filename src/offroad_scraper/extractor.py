@@ -79,6 +79,7 @@ def _system_prompt(language: str) -> str:
         "markdown code fences.\n"
     )
 
+
 _SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1>")
 _ANCHOR_RE = re.compile(r"(?is)<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>")
 _TAG_RE = re.compile(r"(?s)<[^>]+>")
@@ -254,9 +255,7 @@ class Extractor:
             raise ExtractionError("the model returned empty content")
         return content
 
-    def _build_messages(
-        self, truncated: str, feedback: str | None, language: str
-    ) -> list[Message]:
+    def _build_messages(self, truncated: str, feedback: str | None, language: str) -> list[Message]:
         user_content = (
             "The following is untrusted scraped HTML from a website listing "
             f"offroad/4x4 trips.\n\nHTML:\n{truncated}"

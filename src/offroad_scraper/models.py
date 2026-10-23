@@ -198,17 +198,21 @@ class Trip(BaseModel):
 
     @property
     def uid(self) -> str:
-        """Stable identifier for a trip: provider + normalized destination + dates.
+        """Stable identifier for a trip.
 
-        The destination is normalized (lowercased, parenthetical qualifiers
-        stripped) so cosmetic naming differences like "Serbia" vs "Serbia
-        (Serbian Carpathians)" collapse to one event, while genuinely different
-        destinations remain distinct.
+        Keys on the offer URL when present (falling back to the normalized
+        destination), plus the start/end dates. This collapses the same trip
+        extracted with different destination wording ("Serbia" vs "Serbia
+        (Serbian Carpathians)", or "Polska" vs "Twierdza Modlin, Polska") while
+        keeping distinct dates/tours apart.
         """
+        identity = (
+            _normalize_url(self.url) if self.url else _normalize_destination(self.destination)
+        )
         key = json.dumps(
             [
                 _normalize_provider(self.provider),
-                _normalize_destination(self.destination),
+                identity,
                 self.start_date.isoformat(),
                 self.end_date.isoformat(),
             ],
@@ -228,3 +232,8 @@ def _normalize_destination(destination: str) -> str:
     """Lowercase, strip parenthetical qualifiers and non-alphanumeric chars."""
     text = re.sub(r"\([^)]*\)", " ", destination)
     return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _normalize_url(url: str) -> str:
+    """Lowercase and strip fragment/query for a stable URL key."""
+    return url.lower().split("#", 1)[0].split("?", 1)[0]
